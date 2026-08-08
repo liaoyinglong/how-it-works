@@ -11,6 +11,40 @@
 - 宣传中的概念（例如 Agent、RLM、Code Mode）在源码里最终对应什么实现？
 - 它和更简单的实现方式，例如直接写 Python / Shell，有什么工程层面的差异？
 
+## 阅读方式
+
+GitHub 仍然是这个仓库唯一的 Source of Truth；VitePress 只负责把现有 Markdown 渲染成更适合桌面和手机阅读的文档站。
+
+文档站具备：
+
+- 自动扫描专题目录和 Markdown 文件生成侧栏，不需要手工维护导航。
+- VitePress 本地全文搜索。
+- 手机端阅读样式优化，包括正文宽度、标题、代码块和表格横向滚动。
+- PWA 支持，可在 Android / iOS 的浏览器中添加到主屏幕。
+- Vercel 部署配置，GitHub push / PR 可以直接生成 Production / Preview 部署。
+
+本地运行：
+
+```bash
+pnpm install
+pnpm docs:dev
+```
+
+构建和本地预览：
+
+```bash
+pnpm docs:build
+pnpm docs:preview
+```
+
+Vercel 导入这个 GitHub 仓库后会读取 `vercel.json`：
+
+- Build Command：`pnpm docs:build`
+- Output Directory：`.vitepress/dist`
+- Install Command：`pnpm install`
+
+因此不需要额外维护 GitHub Pages workflow。
+
 ## Topics
 
 | 主题 | 内容 |
@@ -38,6 +72,7 @@
 
 - 新增一个专题目录时，同步更新根目录 `README.md` 的 Topics。
 - 在现有专题新增、删除或重命名主要文档时，同步更新该专题的 `README.md`。
+- VitePress 侧栏会自动发现 Markdown，因此通常不需要额外修改 `.vitepress` 导航配置。
 - 如果新增内容改变了专题的核心结论、推荐阅读顺序、源码快照或重要引用，也同步修正对应 README / references。
 - 如果上游项目版本变化导致已有结论失效，应标明新的分析 commit，或者明确说明旧文档对应的历史快照。
 - README 只保留导航和核心结论；细节尽量拆到专题文档，避免 README 变成不可维护的超长文章。
