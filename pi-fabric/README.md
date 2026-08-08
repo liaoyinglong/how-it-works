@@ -46,24 +46,33 @@ ActionRegistry
 4. **把 MCP、Pi tools、extension tools、sub-agent 统一到同一套调用协议中**。
 5. **把 RLM、Council、Workflow 等能力建立在同一层 runtime 上**。
 
+但这里有一个很重要的边界：
+
+> Fabric 并不会消灭真正需要 LLM 语义判断的步骤。它主要省掉的是那些本来可以由确定性程序控制流完成、却让主模型每一步都重新充当调度器的往返。
+
+例如 `grep → 根据命中路径 read → filter → return` 可以完全留在一个 TypeScript program 中；而“这 20 个实现里哪个最可疑”仍然需要主 LLM、child agent 或 RLM 做语义判断。详细见 [context-economy.md](./context-economy.md)。
+
 ## 推荐阅读顺序
 
 如果想理解 Fabric 的源码，建议按下面顺序看：
 
 1. [architecture.md](./architecture.md) — 整体架构和模块职责
 2. [runtime-flow.md](./runtime-flow.md) — 一次 `fabric_exec` 从模型到工具再返回的完整执行链路
-3. [rlm-and-agents.md](./rlm-and-agents.md) — RLM、Agent、Council、Workflow 到底是怎么实现的
-4. [references.md](./references.md) — 关键源码入口与相关背景资料
+3. [context-economy.md](./context-economy.md) — 中间态、`return`、Prompt/TypeScript/Runtime 三层约束，以及为什么能减少 LLM↔Tool 往返
+4. [rlm-and-agents.md](./rlm-and-agents.md) — RLM、Agent、Council、Workflow 到底是怎么实现的
+5. [references.md](./references.md) — 关键源码入口与相关背景资料
 
 ## 最重要的源码入口
 
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/index.ts) | Pi extension 入口，注册 `fabric_exec` 和生命周期事件 |
-| [`src/fabric-exec-tool.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/fabric-exec-tool.ts) | `fabric_exec` 的 ToolDefinition |
+| [`src/fabric-exec-tool.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/fabric-exec-tool.ts) | `fabric_exec` 的 ToolDefinition、prompt guidance、最终 result 输出 |
+| [`skills/fabric-exec/SKILL.md`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/skills/fabric-exec/SKILL.md) | 模型侧的 Fabric API / Read economy / return 约定 |
 | [`src/execution-service.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/execution-service.ts) | Fabric 真正的执行编排核心 |
 | [`src/runtime/type-checker.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/type-checker.ts) | TypeScript 检查与 transpile |
-| [`src/runtime/quickjs-runtime.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/quickjs-runtime.ts) | 默认 QuickJS sandbox + Host Bridge |
+| [`src/runtime/guest-types.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/guest-types.ts) | Guest program 可见的 TypeScript API declarations |
+| [`src/runtime/quickjs-runtime.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/quickjs-runtime.ts) | 默认 QuickJS sandbox + Host Bridge + guest globals |
 | [`src/core/action-registry.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/core/action-registry.ts) | Provider/action 注册、查找、校验、审批和调用 |
 | [`src/fabric-state.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/fabric-state.ts) | 整体状态和 provider 初始化 |
 | [`src/providers/pi-tools-provider.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/providers/pi-tools-provider.ts) | Pi 原生工具如何进入 Fabric |
@@ -112,7 +121,22 @@ ActionRegistry
 
 换句话说，`fabric_exec` 只是入口，真正构成 Fabric 的是：
 
-> **TypeScript Guest Runtime + JSON Host Bridge + Action Registry + Provider System + Agent Runtime**
+> **Prompt Guidance + TypeScript Guest API + QuickJS Runtime + JSON Host Bridge + Action Registry + Provider System + Agent Runtime**
+
+其中：
+
+```text
+Prompt Guidance
+  → 教模型怎么组织程序、Search before read、compact return
+
+TypeScript declarations
+  → 告诉模型 pi.read / pi.grep / agents.run 等 API 的签名和返回形状
+
+Runtime
+  → 真正提供这些 API，并负责 validate / approval / audit / timeout / execution
+```
+
+所以“哪些文件相关、读多少、最后 return 什么”通常仍然是模型生成的 TypeScript 决定；Fabric 提供的是让这种动态控制流可靠运行的环境，而不是内置一个自动判断相关文件的算法。
 
 ---
 
