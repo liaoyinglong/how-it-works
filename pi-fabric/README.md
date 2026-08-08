@@ -31,8 +31,9 @@ ActionRegistry
    ├─ pi.*
    ├─ mcp.*
    ├─ extensions.*
-   ├─ agents.*
-   ├─ mesh.*
+   ├─ agents.* ──► Agent / Actor / RLM
+   ├─ mesh.*   ──► Topics / State / Topology
+   ├─ compact.*
    ├─ memory.*
    ├─ state.*
    └─ schema.*
@@ -44,7 +45,7 @@ ActionRegistry
 2. **让中间数据留在 sandbox，而不是不断进入主模型 context**。
 3. **让并行、条件、循环由程序完成，而不是靠 LLM 一轮一轮决定**。
 4. **把 MCP、Pi tools、extension tools、sub-agent 统一到同一套调用协议中**。
-5. **把 RLM、Council、Workflow 等能力建立在同一层 runtime 上**。
+5. **在同一个 runtime 上继续构建 RLM、Workflow、Actor、Mesh、Compaction 等能力**。
 
 但这里有一个很重要的边界：
 
@@ -54,31 +55,63 @@ ActionRegistry
 
 ## 推荐阅读顺序
 
-如果想理解 Fabric 的源码，建议按下面顺序看：
+如果想从核心运行链路一路读到更高级能力，建议按下面顺序：
 
 1. [architecture.md](./architecture.md) — 整体架构和模块职责
 2. [runtime-flow.md](./runtime-flow.md) — 一次 `fabric_exec` 从模型到工具再返回的完整执行链路
 3. [context-economy.md](./context-economy.md) — 中间态、`return`、Prompt/TypeScript/Runtime 三层约束，以及为什么能减少 LLM↔Tool 往返
 4. [rlm-and-agents.md](./rlm-and-agents.md) — RLM、Agent、Council、Workflow 到底是怎么实现的
-5. [references.md](./references.md) — 关键源码入口与相关背景资料
+5. [actors-and-mesh.md](./actors-and-mesh.md) — persistent Actor、Mesh、Participant Directory、ControlPlane、durable residency
+6. [compaction.md](./compaction.md) — deterministic compaction、programmatic compaction 与 context lifecycle
+7. [comparison.md](./comparison.md) — Fabric vs Python / MCP / LangGraph / RLM
+8. [benchmarks.md](./benchmarks.md) — 如何验证速度、Token、Context 与任务质量，及上游已有 benchmark harness
+9. [references.md](./references.md) — 关键源码入口与相关背景资料
+
+## 文档地图
+
+| 文档 | 核心问题 |
+|---|---|
+| [architecture.md](./architecture.md) | Fabric 从整体上分成哪些层？ |
+| [runtime-flow.md](./runtime-flow.md) | 一次 `fabric_exec` 到底经过哪些函数和 runtime？ |
+| [context-economy.md](./context-economy.md) | 为什么多个 tool call 可以留在一次 program 中？中间结果去哪了？ |
+| [rlm-and-agents.md](./rlm-and-agents.md) | Recursive Agent / RLM / Council / Workflow 在源码里是什么？ |
+| [actors-and-mesh.md](./actors-and-mesh.md) | 长期 Actor 如何保存 context？多个 participant 怎么跨 session 协调？ |
+| [compaction.md](./compaction.md) | 长对话越来越大以后，Fabric 怎么重建 active context？ |
+| [comparison.md](./comparison.md) | Fabric 和直接写脚本、MCP、LangGraph、RLM 到底是不是同类？ |
+| [benchmarks.md](./benchmarks.md) | 如何证明 Fabric 真的更快/更省，而不是只靠架构推断？ |
+| [references.md](./references.md) | 源码、官方文档和论文从哪里继续追？ |
 
 ## 最重要的源码入口
 
+### Programmatic Runtime
+
 | 文件 | 作用 |
 |---|---|
-| [`src/index.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/index.ts) | Pi extension 入口，注册 `fabric_exec` 和生命周期事件 |
-| [`src/fabric-exec-tool.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/fabric-exec-tool.ts) | `fabric_exec` 的 ToolDefinition、prompt guidance、最终 result 输出 |
-| [`skills/fabric-exec/SKILL.md`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/skills/fabric-exec/SKILL.md) | 模型侧的 Fabric API / Read economy / return 约定 |
-| [`src/execution-service.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/execution-service.ts) | Fabric 真正的执行编排核心 |
-| [`src/runtime/type-checker.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/type-checker.ts) | TypeScript 检查与 transpile |
-| [`src/runtime/guest-types.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/guest-types.ts) | Guest program 可见的 TypeScript API declarations |
-| [`src/runtime/quickjs-runtime.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/quickjs-runtime.ts) | 默认 QuickJS sandbox + Host Bridge + guest globals |
-| [`src/core/action-registry.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/core/action-registry.ts) | Provider/action 注册、查找、校验、审批和调用 |
-| [`src/fabric-state.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/fabric-state.ts) | 整体状态和 provider 初始化 |
-| [`src/providers/pi-tools-provider.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/providers/pi-tools-provider.ts) | Pi 原生工具如何进入 Fabric |
-| [`src/providers/mcp-provider.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/providers/mcp-provider.ts) | MCP 如何进入 Fabric |
-| [`src/providers/agents-provider.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/providers/agents-provider.ts) | `agents.*` API |
-| [`src/agents/manager.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/agents/manager.ts) | 子 Agent 真正如何被启动和管理 |
+| [`src/index.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/index.ts) | Pi extension 入口、生命周期、compaction hook |
+| [`src/fabric-exec-tool.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/fabric-exec-tool.ts) | `fabric_exec` ToolDefinition、prompt guidance、最终 result |
+| [`skills/fabric-exec/SKILL.md`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/skills/fabric-exec/SKILL.md) | 模型侧 Fabric API / Read economy / return 约定 |
+| [`src/execution-service.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/execution-service.ts) | 真正的执行编排核心 |
+| [`src/runtime/guest-types.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/guest-types.ts) | Guest program 可见的 TypeScript declarations |
+| [`src/runtime/quickjs-runtime.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/runtime/quickjs-runtime.ts) | QuickJS sandbox、Host Bridge、guest globals |
+| [`src/core/action-registry.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/core/action-registry.ts) | Provider/action 的发现、校验、审批、调用、审计 |
+
+### Agent / Actor / Mesh
+
+| 文件 | 作用 |
+|---|---|
+| [`src/agents/manager.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/agents/manager.ts) | Child Agent lifecycle |
+| [`src/actors/manager.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/actors/manager.ts) | Persistent Actor、mailbox、activation、session |
+| [`src/mesh/store.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/mesh/store.ts) | Durable topics 与 versioned shared state |
+| [`src/topology/participant-directory.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/topology/participant-directory.ts) | Root / Agent / Actor 的统一 participant directory |
+| [`src/topology/control-plane.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/topology/control-plane.ts) | 跨 host steer/followUp/stop + ACK |
+
+### Compaction
+
+| 文件 | 作用 |
+|---|---|
+| [`src/compaction/hook.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/compaction/hook.ts) | Deterministic compaction、cut、token budget |
+| [`src/core/compact-controller.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/core/compact-controller.ts) | Advisory → committed programmatic compaction |
+| [`src/providers/compact-provider.ts`](https://github.com/monotykamary/pi-fabric/blob/08019b6138e90466d2b4ebd1acedd3d2523eb164/src/providers/compact-provider.ts) | `compact.request/status/cancel` |
 
 ## 一个最小心智模型
 
@@ -110,8 +143,9 @@ ActionRegistry
        │
        ├─ Pi tool
        ├─ MCP
-       ├─ Agent
-       └─ Extension
+       ├─ Agent / Actor
+       ├─ Mesh
+       └─ Compact
 
 最终 value
    │
@@ -121,7 +155,7 @@ ActionRegistry
 
 换句话说，`fabric_exec` 只是入口，真正构成 Fabric 的是：
 
-> **Prompt Guidance + TypeScript Guest API + QuickJS Runtime + JSON Host Bridge + Action Registry + Provider System + Agent Runtime**
+> **Prompt Guidance + TypeScript Guest API + QuickJS Runtime + JSON Host Bridge + Action Registry + Provider System + Agent/Context Runtime**
 
 其中：
 
@@ -133,7 +167,7 @@ TypeScript declarations
   → 告诉模型 pi.read / pi.grep / agents.run 等 API 的签名和返回形状
 
 Runtime
-  → 真正提供这些 API，并负责 validate / approval / audit / timeout / execution
+  → 真正提供 API，并负责 validate / approval / audit / timeout / execution
 ```
 
 所以“哪些文件相关、读多少、最后 return 什么”通常仍然是模型生成的 TypeScript 决定；Fabric 提供的是让这种动态控制流可靠运行的环境，而不是内置一个自动判断相关文件的算法。
