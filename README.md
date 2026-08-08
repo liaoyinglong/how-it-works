@@ -10,6 +10,7 @@
 - 为什么它会更快、更省 context，或者为什么某些场景反而不会？
 - 宣传中的概念（例如 Agent、RLM、Code Mode）在源码里最终对应什么实现？
 - 它和更简单的实现方式，例如直接写 Python / Shell，有什么工程层面的差异？
+- 如果项目声称更快、更省 Token，源码里有没有 benchmark harness，应该怎样公平验证？
 
 ## 阅读方式
 
@@ -52,7 +53,7 @@ Vercel 导入这个 GitHub 仓库后会读取 `vercel.json`：
 
 | 主题 | 内容 |
 |---|---|
-| [Pi Fabric](./pi-fabric/) | 从源码拆解 `fabric_exec`、QuickJS、Host Bridge、ActionRegistry、MCP、Agent、RLM，以及 Context Economy |
+| [Pi Fabric](./pi-fabric/) | 从源码拆解 `fabric_exec`、QuickJS、Host Bridge、ActionRegistry、MCP、Agent/RLM、Persistent Actor、Mesh/Topology、Compaction、Context Economy，以及与相邻方案的对比和 benchmark 方法 |
 
 后续会继续增加其他项目，每个项目原则上使用独立目录，并在目录内提供自己的 `README.md` 作为专题入口。
 
@@ -66,6 +67,7 @@ Vercel 导入这个 GitHub 仓库后会读取 `vercel.json`：
 4. **解释执行链路**：相比功能清单，更关注数据和控制流究竟怎么走。
 5. **保留边界条件**：不把“某些场景更快/更省 token”写成无条件结论。
 6. **链接原始资料**：尽量附上源码、官方文档、论文和相关项目链接，方便继续深入。
+7. **Benchmark 不编数字**：架构推断和真实测量分开；没有受控实验结果时，保留 `TBD` 或明确标注为 hypothesis。
 
 ## 维护约定
 
@@ -110,6 +112,12 @@ references / navigation
 - 中间态、`return` 与 Main LLM context 的边界
 - Prompt Guidance + TypeScript declarations + Runtime 三层关系
 - Agent / recursive agent / RLM / Council / Workflow
-- 源码引用与相关论文
+- Persistent Actor、serial mailbox、event/topic activation
+- Mesh durable topics、CAS shared state、Participant Directory、ControlPlane
+- Session / durable residency 与跨 host participant ownership
+- Deterministic compaction、programmatic compaction、child compaction
+- Fabric vs Python / MCP / LangGraph / RLM 的边界
+- 上游 DeepSWE-style benchmark harness，以及 repo-search / bulk-read / review 的实验设计
+- 源码引用、官方资料与相关论文
 
 建议从 [pi-fabric/README.md](./pi-fabric/README.md) 开始阅读。
