@@ -3,5 +3,17 @@
   "buildCommand": "npm run docs:build",
   "outputDirectory": ".vitepress/dist",
   "installCommand": "npm install",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/README",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*/README",
+      "destination": "/:path*",
+      "permanent": true
+    }
+  ]
 }
