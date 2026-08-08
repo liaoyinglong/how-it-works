@@ -10,6 +10,10 @@ export default withPwa(
     title: 'How It Works',
     description: '从源码、运行时、协议和真实执行链路理解工具、框架和工程项目。',
     cleanUrls: true,
+    rewrites(id) {
+      if (id === 'README.md') return 'index.md'
+      return id.replace(/\/README\.md$/, '/index.md')
+    },
     lastUpdated: true,
     head: [
       ['meta', { name: 'theme-color', content: '#111827' }],
