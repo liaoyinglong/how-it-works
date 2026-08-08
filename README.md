@@ -39,9 +39,12 @@ pnpm docs:preview
 
 Vercel 导入这个 GitHub 仓库后会读取 `vercel.json`：
 
-- Build Command：`pnpm docs:build`
+- Build Command：`npm run docs:build`
 - Output Directory：`.vitepress/dist`
-- Install Command：`pnpm install`
+- Install Command：`npm install`
+- Node.js：`24.x`
+
+本地开发仍然使用 `pnpm`；Vercel 构建故意使用 npm，避免部署环境对 pnpm / Corepack 版本探测造成不稳定。
 
 因此不需要额外维护 GitHub Pages workflow。
 
